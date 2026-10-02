@@ -1,0 +1,7 @@
+# Configuration du projet — prix au m² (DVF)
+data:
+  base_url: "https://files.data.gouv.fr/geo-dvf/latest/csv"
+  departement: "33"          # MVP : Gironde
+  years: [2021, 2022, 2023, 2024, 2025]
+  raw_dir: "data/raw"
+  manifest: "data/manifest.json"   # date de téléchargement, taille, SHA-256 par fichier

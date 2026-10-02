@@ -1,0 +1,32 @@
+{
+  "dvf_2021_33.csv.gz": {
+    "url": "https://files.data.gouv.fr/geo-dvf/latest/csv/2021/departements/33.csv.gz",
+    "downloaded_at": "2026-10-02T18:57:08+00:00",
+    "size_bytes": 3255430,
+    "sha256": "e4b4a95d474e0b0b4ae8b025ac9b1451d01a17bfd9cb496154f0c76992518b7e"
+  },
+  "dvf_2022_33.csv.gz": {
+    "url": "https://files.data.gouv.fr/geo-dvf/latest/csv/2022/departements/33.csv.gz",
+    "downloaded_at": "2026-10-02T18:57:10+00:00",
+    "size_bytes": 3215511,
+    "sha256": "9d405715d0e225236bc6bb8a53f5b4a0f43dc4b35a49e2f91d7eaecf466d47d6"
+  },
+  "dvf_2023_33.csv.gz": {
+    "url": "https://files.data.gouv.fr/geo-dvf/latest/csv/2023/departements/33.csv.gz",
+    "downloaded_at": "2026-10-02T18:57:12+00:00",
+    "size_bytes": 2511818,
+    "sha256": "f7f783a823dc1300e5e8495605e969fece9e11e96944d322c14674ef3ec02e30"
+  },
+  "dvf_2024_33.csv.gz": {
+    "url": "https://files.data.gouv.fr/geo-dvf/latest/csv/2024/departements/33.csv.gz",
+    "downloaded_at": "2026-10-02T18:57:13+00:00",
+    "size_bytes": 2226811,
+    "sha256": "e966fb5cea35881abd9511ff3a51bdc364a0bb468f0b72618734b0a14893652c"
+  },
+  "dvf_2025_33.csv.gz": {
+    "url": "https://files.data.gouv.fr/geo-dvf/latest/csv/2025/departements/33.csv.gz",
+    "downloaded_at": "2026-10-02T18:57:15+00:00",
+    "size_bytes": 2580124,
+    "sha256": "e1a50b26105c60225ba66b7d49eba939ee5d67e25903f2dee29959230f658661"
+  }
+}

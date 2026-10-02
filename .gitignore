@@ -1,0 +1,15 @@
+# Environnement
+.venv/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Données (reproductibles via `python -m immo.download`)
+data/raw/
+data/interim/
+data/processed/
+
+# Divers
+.DS_Store
