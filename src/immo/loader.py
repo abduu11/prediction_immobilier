@@ -23,15 +23,20 @@ EXPECTED_COLUMNS = [
 
 # Colonnes conservées pour la suite du pipeline (sprint 2+)
 USECOLS = [
-    "id_mutation", "date_mutation", "nature_mutation", "valeur_fonciere",
-    "adresse_numero", "adresse_nom_voie", "code_postal", "code_commune",
-    "nom_commune", "code_departement", "id_parcelle", "nombre_lots",
-    "type_local", "surface_reelle_bati", "nombre_pieces_principales",
-    "surface_terrain", "longitude", "latitude",
+    "id_mutation", "date_mutation", "numero_disposition", "nature_mutation",
+    "valeur_fonciere", "adresse_numero", "adresse_nom_voie", "code_postal",
+    "code_commune", "nom_commune", "code_departement", "id_parcelle",
+    "lot1_numero", "nombre_lots", "type_local", "surface_reelle_bati",
+    "nombre_pieces_principales", "code_nature_culture",
+    "code_nature_culture_speciale", "surface_terrain", "longitude", "latitude",
 ]
 
 DTYPES = {
     "id_mutation": "string",
+    "numero_disposition": "string",
+    "lot1_numero": "string",
+    "code_nature_culture": "string",
+    "code_nature_culture_speciale": "string",
     "nature_mutation": "category",
     "valeur_fonciere": "float64",
     "adresse_numero": "string",

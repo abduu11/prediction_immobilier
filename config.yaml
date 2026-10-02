@@ -5,3 +5,15 @@ data:
   years: [2021, 2022, 2023, 2024, 2025]
   raw_dir: "data/raw"
   manifest: "data/manifest.json"   # date de téléchargement, taille, SHA-256 par fichier
+  processed_dir: "data/processed"
+
+clean:
+  surface_bounds:                  # surface_reelle_bati (m²)
+    Appartement: [9, 500]
+    Maison: [20, 1000]
+  pieces_bounds: [1, 15]
+  min_valeur_fonciere: 15000       # exclut les prix symboliques
+  max_surface_terrain_maison: 10000  # exclut les maisons vendues avec de grands terrains
+  prix_m2_bounds: [200, 25000]     # garde-fous absolus (non estimés sur les données)
+  quantile_bounds: [0.01, 0.99]    # P1-P99 par type : à ajuster sur le TRAIN uniquement (sprint 3)
+  report_dir: "reports"

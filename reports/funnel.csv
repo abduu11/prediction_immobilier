@@ -1,0 +1,14 @@
+etape,lignes,mutations,mutations_perdues
+Lignes brutes,525352,187909,0
+Nature = Vente,482710,171718,16191
+Une seule disposition,470471,171573,145
+Sans local industriel/commercial,426914,162903,8670
+Au moins un appartement ou une maison,313384,122615,40288
+Exactement un local principal,278102,117275,5340
+Une ligne par vente,117275,117275,0
+Prix renseigné,117213,117213,62
+Surface bâtie dans les bornes,117139,117139,74
+Nombre de pièces dans les bornes,117072,117072,67
+Prix minimal,116773,116773,299
+Terrain maison plafonné,115109,115109,1664
+Prix/m² dans les garde-fous absolus,114887,114887,222
