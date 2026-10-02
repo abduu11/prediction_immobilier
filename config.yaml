@@ -17,3 +17,11 @@ clean:
   prix_m2_bounds: [200, 25000]     # garde-fous absolus (non estimés sur les données)
   quantile_bounds: [0.01, 0.99]    # P1-P99 par type : à ajuster sur le TRAIN uniquement (sprint 3)
   report_dir: "reports"
+
+split:                             # découpage temporel (sur date_mutation)
+  train_years: [2021, 2022, 2023]
+  valid_years: [2024]
+  test_years: [2025]               # touché une seule fois, à la toute fin
+
+baseline:
+  min_ventes_commune: 5            # en dessous : repli sur la médiane du type de bien
