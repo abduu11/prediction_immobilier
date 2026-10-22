@@ -10,6 +10,12 @@ DVF géolocalisées (Etalab), fichiers par année et par département :
 - Hors périmètre : Alsace (67, 68), Moselle (57), Mayotte (976).
 - Les coordonnées sont celles du centre de la parcelle (WGS-84) ; ~2,5 % de lignes sans coordonnées.
 
+## Communes (contours, population)
+`https://geo.api.gouv.fr/departements/{dep}/communes?format=geojson&geometry=contour&fields=nom,code,population,surface,codesPostaux`
+(Licence Ouverte, Etalab), téléchargé par `python -m immo.geo` dans `raw/communes_{dep}.geojson` et enregistré dans
+le manifeste. La population est un instantané récent, utilisé comme variable de contexte (pas une information sur
+la vente). Une commune de nos ventes (33409, 7 ventes) n'existe plus dans l'API : sa population est imputée.
+
 ## Version figée
 `manifest.json` enregistre pour chaque fichier téléchargé : URL, date de téléchargement,
 taille et SHA-256. Les fichiers bruts (`raw/`) ne sont pas versionnés dans git.

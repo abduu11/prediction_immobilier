@@ -18,6 +18,7 @@ from immo.baseline import MedianBaseline
 from immo.clean import apply_price_bounds, fit_price_bounds
 from immo.config import PROJECT_ROOT, load_config
 from immo.features import add_features
+from immo.geo import load_communes
 from immo.metrics import metrics_by_group
 from immo.models import build_hgb, build_ridge
 from immo.split import load_clean, temporal_split
@@ -41,25 +42,43 @@ def evaluate_baseline(fit_df: pd.DataFrame, eval_df: pd.DataFrame, cfg: dict) ->
     }
 
 
-def fit_models(fit_trimmed: pd.DataFrame, params: dict) -> dict:
-    X, y = add_features(fit_trimmed), fit_trimmed["prix_m2"]
-    return {
-        "ridge": build_ridge(**params["ridge"]).fit(X, y),
-        "hgb": build_hgb(**params["hgb"]).fit(X, y),
-    }
+# nom -> (constructeur, variables géographiques dérivées ?)
+MODEL_SPECS = {
+    "ridge": (build_ridge, False),
+    "hgb": (build_hgb, False),
+    "ridge_geo": (build_ridge, True),
+    "hgb_geo": (build_hgb, True),
+}
+
+
+def model_inputs(df: pd.DataFrame, geo: bool, communes: pd.DataFrame | None) -> pd.DataFrame:
+    return add_features(df, communes if geo else None)
+
+
+def fit_models(fit_trimmed: pd.DataFrame, params: dict, communes: pd.DataFrame | None = None) -> dict:
+    y = fit_trimmed["prix_m2"]
+    models = {}
+    for name, (builder, geo) in MODEL_SPECS.items():
+        if name in params:
+            kwargs = {**params[name], **({"geo": True} if geo else {})}
+            models[name] = builder(**kwargs).fit(model_inputs(fit_trimmed, geo, communes), y)
+    return models
 
 
 def evaluate_models(fit_df: pd.DataFrame, eval_df: pd.DataFrame, cfg: dict,
-                    params: dict | None = None, return_models: bool = False):
+                    params: dict | None = None, return_models: bool = False,
+                    communes: pd.DataFrame | None = None):
     report = {"baseline_mediane_commune": evaluate_baseline(fit_df, eval_df, cfg)}
     models = {}
     if params:
+        if communes is None and any(MODEL_SPECS[n][1] for n in params if n in MODEL_SPECS):
+            communes = load_communes(cfg)
         fit_trimmed, _ = prepare_fit_set(fit_df, cfg)
-        models = fit_models(fit_trimmed, params)
-        X_eval = add_features(eval_df)
+        models = fit_models(fit_trimmed, params, communes)
         for name, model in models.items():
+            pred = model.predict(model_inputs(eval_df, MODEL_SPECS[name][1], communes))
             report[name] = {"params": params[name],
-                            "metrics": metrics_by_group(eval_df, model.predict(X_eval), "type_local")}
+                            "metrics": metrics_by_group(eval_df, pred, "type_local")}
     return (report, models) if return_models else report
 
 

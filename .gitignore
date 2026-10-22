@@ -14,5 +14,8 @@ data/processed/
 # Modèles entraînés (régénérés par `python -m immo.train`)
 models/
 
+# Cartes interactives HTML (lourdes, régénérées par `python -m immo.maps`)
+reports/maps/
+
 # Divers
 .DS_Store

@@ -28,5 +28,11 @@
     "downloaded_at": "2026-10-02T18:57:15+00:00",
     "size_bytes": 2580124,
     "sha256": "e1a50b26105c60225ba66b7d49eba939ee5d67e25903f2dee29959230f658661"
+  },
+  "communes_33.geojson": {
+    "url": "https://geo.api.gouv.fr/departements/33/communes?format=geojson&geometry=contour&fields=nom%2Ccode%2Cpopulation%2Csurface%2CcodesPostaux",
+    "downloaded_at": "2026-10-22T20:13:59+00:00",
+    "size_bytes": 4243809,
+    "sha256": "9ff34ca85e01285dd6530fc4d090169e4eda6cfda41436a21d3489b2a3ff79d1"
   }
 }
