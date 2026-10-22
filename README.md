@@ -6,7 +6,7 @@ Projet data : prédire le prix au m² des appartements et maisons à partir des
 
 **Stack** : Python, pandas, scikit-learn, Streamlit. **MVP** : Gironde (33), 2021–2025.
 
-> Statut : sprints 1 à 3 terminés (données, nettoyage, validation + baseline). Voir l'avancement ci-dessous.
+> Statut : sprints 1 à 4 terminés (données, nettoyage, baseline, modèles). Voir l'avancement ci-dessous.
 
 ## Installation
 
@@ -30,10 +30,11 @@ La configuration (département, années) est dans `config.yaml`.
 
 ```
 config.yaml          paramètres (département, années, chemins)
-src/immo/            download.py, loader.py, clean.py, split.py, baseline.py, metrics.py, evaluate.py, config.py
+src/immo/            download, loader, clean, split, baseline, features, models, train, evaluate, metrics, config
 tests/               pytest
 notebooks/           01_exploration.ipynb
-reports/             funnel.csv (entonnoir), metrics.json (validation)
+reports/             funnel.csv, metrics.json (validation), best_params.json
+models/              modèles entraînés (gitignoré)
 data/                raw/ (gitignoré), manifest.json (versions + SHA-256), README.md
 ```
 
@@ -103,6 +104,41 @@ Pour situer la difficulté : prédire la médiane globale du type de bien donne 
 pièces, la date et les coordonnées ; les sprints suivants les ajoutent.
 La MAPE (moyenne) est tirée vers le haut par les biens à faible prix/m² ; la MAPE médiane est plus robuste.
 
+## Modèles (sprint 4)
+
+```bash
+python -m immo.train             # réglage (CV temporelle sur le train) + évaluation sur la validation 2024
+python -m immo.evaluate          # ré-évalue avec reports/best_params.json (sans re-régler)
+```
+
+- **Variables** (`features.py`) : surface (et log), pièces, surface/pièce, maison/appartement, terrain (maisons),
+  dépendance, lots, index mensuel, commune et commune×type (encodage cible), latitude/longitude
+  (+ 2 axes tournés à 45°). Les coordonnées manquantes sont remplacées par le centroïde de la commune
+  appris sur le train.
+- **Anti-fuite** : tout ce qui s'apprend (centroïdes, `TargetEncoder` validé en 5 plis, normalisation) est dans
+  le `Pipeline` et ajusté sur les données d'ajustement seules (testé : l'encodeur ne connaît que les communes du train).
+- **Cible** : log(prix/m²), prédiction ramenée en €/m².
+- **Ridge** : interactions d'ordre 2 + régularisation (alpha = 100). **HistGradientBoosting** : 600 itérations max,
+  63 feuilles, perte absolue, pas d'apprentissage 0,03. Réglage par validation croisée temporelle à fenêtre croissante
+  sur le train (2021 → 2022, 2021-22 → 2023), critère MAE.
+
+Résultats sur la validation 2024 (17 793 ventes) :
+
+| Modèle | MAE (€/m²) | vs baseline | MAPE | MAPE médiane | R² |
+|---|---:|---:|---:|---:|---:|
+| Baseline (médiane par commune) | 899 | — | 33,0 % | 17,3 % | 0,46 |
+| Ridge | 833 | −7,3 % | 29,2 % | 16,0 % | 0,50 |
+| **HistGradientBoosting** | **730** | **−18,8 %** | 27,0 % | 13,8 % | 0,64 |
+
+Par type de bien, HGB : appartements MAE 648 €/m² (MAPE 18,8 %), maisons MAE 789 €/m² (MAPE 32,9 %).
+Les maisons sont plus difficiles : le prix/m² dépend beaucoup du terrain, de l'état et de la situation exacte,
+absents des données.
+
+Limites connues : plusieurs meilleurs hyperparamètres HGB sont en bordure de la grille testée
+(pas d'apprentissage minimal, feuilles maximales), un réglage plus large pourrait encore gagner un peu.
+La validation 2024 a servi à choisir quelques options de conception (index temporel pour HGB seulement) ;
+le test 2025 reste intact.
+
 ## Avancement
 
 | Sprint | Contenu | État |
@@ -110,6 +146,6 @@ La MAPE (moyenne) est tirée vers le haut par les biens à faible prix/m² ; la 
 | S1 | Données : téléchargement, lecture typée, exploration | ✅ |
 | S2 | Nettoyage (multi-lots, doublons, aberrants) | ✅ |
 | S3 | Découpage temporel + baseline | ✅ |
-| S4 | Ridge + HistGradientBoosting | à faire |
+| S4 | Ridge + HistGradientBoosting | ✅ |
 | S5 | Variables géographiques, validation spatiale, cartes | à faire |
 | S6 | App Streamlit, déploiement | à faire |

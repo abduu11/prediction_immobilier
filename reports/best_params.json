@@ -1,0 +1,20 @@
+{
+  "ridge": {
+    "poly": true,
+    "use_time": false,
+    "alpha": 100
+  },
+  "hgb": {
+    "use_time": true,
+    "min_samples_leaf": 20,
+    "max_leaf_nodes": 63,
+    "max_iter": 600,
+    "loss": "absolute_error",
+    "learning_rate": 0.03,
+    "l2_regularization": 10.0
+  },
+  "cv_mae": {
+    "ridge": 804.7,
+    "hgb": 701.8
+  }
+}

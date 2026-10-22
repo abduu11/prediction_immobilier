@@ -12,6 +12,14 @@ def load_clean(config: dict | None = None) -> pd.DataFrame:
     return pd.read_parquet(path)
 
 
+def year_splits(dates: pd.Series):
+    """Validation croisée temporelle à fenêtre croissante : pour chaque année Y (sauf la première),
+    entraînement sur les années < Y, évaluation sur l'année Y. Retourne des positions (iloc)."""
+    years = pd.Series(dates).dt.year.to_numpy()
+    for y in sorted(set(years))[1:]:
+        yield (years < y).nonzero()[0], (years == y).nonzero()[0]
+
+
 def temporal_split(df: pd.DataFrame, config: dict | None = None):
     """Découpe selon l'année de la date de mutation (config.yaml, section `split`).
 
