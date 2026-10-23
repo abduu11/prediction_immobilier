@@ -4,7 +4,8 @@
 
 Produit reports/figures/carte_prix.png et carte_erreurs.png (versionnées) et des cartes interactives
 pydeck dans reports/maps/*.html (non versionnées ; l'application Streamlit réutilise `choropleth_deck`).
-Les erreurs sont celles du modèle `hgb_geo` sur la VALIDATION 2024 (le test 2025 reste réservé).
+Les erreurs sont celles du modèle `hgb_geo` ajusté sur 2021-2024 et évalué sur le TEST 2025
+(`python -m immo.evaluate --test` doit avoir été lancé : il enregistre models/hgb_geo_test.joblib).
 Les communes avec trop peu de ventes sont grisées (statistique non fiable).
 """
 import copy
@@ -104,9 +105,9 @@ def error_map(geojson: dict, table: pd.DataFrame, path) -> None:
     sm = draw_choropleth(axes[1], geojson, table["ape_median"], "viridis_r", ape_norm,
                          "Erreur relative absolue médiane")
     fig.colorbar(sm, ax=axes[1], shrink=0.6, label="%")
-    fig.suptitle("Erreurs du modèle HGB (variables géographiques) sur la validation 2024", fontsize=12)
+    fig.suptitle("Erreurs du modèle HGB (variables géographiques) sur le test 2025", fontsize=12)
     fig.text(0.5, 0.04, "Biais : rouge = surestimation, bleu = sous-estimation. "
-             "Gris : moins de 10 ventes de validation dans la commune.", ha="center", fontsize=8)
+             "Gris : moins de 10 ventes de test dans la commune.", ha="center", fontsize=8)
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
 
@@ -138,7 +139,7 @@ def run(config: dict | None = None) -> None:
     cfg = config or load_config()
     geojson = load_geojson(cfg)
     clean = load_clean(cfg)
-    _, valid, _ = temporal_split(clean, cfg)
+    _, _, test = temporal_split(clean, cfg)
 
     fig_dir = PROJECT_ROOT / cfg["clean"]["report_dir"] / "figures"
     html_dir = PROJECT_ROOT / cfg["clean"]["report_dir"] / "maps"
@@ -148,12 +149,12 @@ def run(config: dict | None = None) -> None:
     prices = price_table(clean)
     price_map(geojson, prices, fig_dir / "carte_prix.png")
 
-    model_path = PROJECT_ROOT / "models" / "hgb_geo_validation.joblib"
+    model_path = PROJECT_ROOT / "models" / "hgb_geo_test.joblib"
     if not model_path.exists():
-        raise FileNotFoundError(f"{model_path} absent : lancer `python -m immo.train`")
+        raise FileNotFoundError(f"{model_path} absent : lancer `python -m immo.evaluate --test`")
     model = joblib.load(model_path)
-    pred = model.predict(evaluate.model_inputs(valid, True, load_communes(cfg)))
-    errors = error_table(valid, pred)
+    pred = model.predict(evaluate.model_inputs(test, True, load_communes(cfg)))
+    errors = error_table(test, pred)
     errors.to_csv(PROJECT_ROOT / cfg["clean"]["report_dir"] / "erreurs_par_commune.csv")
     error_map(geojson, errors, fig_dir / "carte_erreurs.png")
 

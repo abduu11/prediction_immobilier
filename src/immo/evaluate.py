@@ -19,6 +19,7 @@ from immo.clean import apply_price_bounds, fit_price_bounds
 from immo.config import PROJECT_ROOT, load_config
 from immo.features import add_features
 from immo.geo import load_communes
+from immo.intervals import coverage_report, error_distribution, fit_ratio_factors
 from immo.metrics import metrics_by_group
 from immo.models import build_hgb, build_ridge
 from immo.split import load_clean, temporal_split
@@ -101,31 +102,85 @@ def load_params(cfg: dict) -> dict | None:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
 
-def run(final: bool = False, config: dict | None = None, save_models: bool = False) -> dict:
+def final_report(train: pd.DataFrame, valid: pd.DataFrame, test: pd.DataFrame, models: dict,
+                 params: dict, cfg: dict) -> dict:
+    """Fourchette de prix et répartition des erreurs du modèle retenu.
+
+    Calibration : modèle ajusté sur le train seul, erreurs mesurées sur la validation.
+    Mesure : modèle final (train+validation) sur le test, qui n'a servi ni à ajuster ni à calibrer.
+    """
+    name, target = cfg["final"]["model"], cfg["final"]["coverage"]
+    geo = MODEL_SPECS[name][1]
+    communes = load_communes(cfg) if geo else None
+    calib = fit_models(prepare_fit_set(train, cfg)[0], {name: params[name]}, communes)[name]
+    p_valid = calib.predict(model_inputs(valid, geo, communes))
+    factors = fit_ratio_factors(valid["prix_m2"], p_valid, valid["type_local"], target)
+    p_test = models[name].predict(model_inputs(test, geo, communes))
+    return {
+        "modele_final": name,
+        "fourchette": {
+            "calibration": "validation (modèle ajusté sur le train seul)",
+            "facteurs_bas_haut": factors,
+            "mesure_sur_test": coverage_report(test["prix_m2"], p_test, test["type_local"], factors, target),
+        },
+        "repartition_erreurs_test": error_distribution(test["prix_m2"], p_test, test["type_local"]),
+    }
+
+
+def run(final: bool = False, config: dict | None = None, save_models: bool = False,
+        force: bool = False) -> dict:
     cfg = config or load_config()
+    rep_dir = PROJECT_ROOT / cfg["clean"]["report_dir"]
+    out = rep_dir / ("metrics_test.json" if final else "metrics.json")
+    if final and out.exists() and not force:
+        raise FileExistsError(f"{out} existe déjà : le test ne doit être évalué qu'une fois (--force pour passer outre)")
+
     train, valid, test = temporal_split(load_clean(cfg), cfg)
     if final:
         fit_df, eval_df, name = pd.concat([train, valid]), test, "test"
     else:
         fit_df, eval_df, name = train, valid, "validation"
 
-    results, models = evaluate_models(fit_df, eval_df, cfg, load_params(cfg), return_models=True)
+    params = load_params(cfg)
+    if final and not params:
+        raise FileNotFoundError(f"{rep_dir / 'best_params.json'} absent : lancer `python -m immo.train`")
+    results, models = evaluate_models(fit_df, eval_df, cfg, params, return_models=True)
     report = {"evaluation": name, **results}
+    if final:
+        report.update(final_report(train, valid, test, models, params, cfg))
     if save_models:
         models_dir = PROJECT_ROOT / "models"
         models_dir.mkdir(exist_ok=True)
         for model_name, model in models.items():
             joblib.dump(model, models_dir / f"{model_name}_{name}.joblib")
-    rep_dir = PROJECT_ROOT / cfg["clean"]["report_dir"]
     rep_dir.mkdir(parents=True, exist_ok=True)
-    out = rep_dir / ("metrics_test.json" if final else "metrics.json")
     out.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    if final:
+        (rep_dir / "intervalles.json").write_text(
+            json.dumps(report["fourchette"]["facteurs_bas_haut"], indent=2), encoding="utf-8")
     print_report(report, name, len(eval_df))
+    if final:
+        print_final(report)
     print(f"-> {out}")
     return report
+
+
+def print_final(report: dict) -> None:
+    f = report["fourchette"]
+    print(f"\nFourchette ({report['modele_final']}), cible de couverture {f['mesure_sur_test']['cible']:.0%} :")
+    for key, v in f["mesure_sur_test"].items():
+        if isinstance(v, dict):
+            fac = f["facteurs_bas_haut"][key]
+            print(f"  {key:12s} facteurs x{fac[0]:.2f} .. x{fac[1]:.2f}  couverture test = {v['couverture']:.1%}  "
+                  f"largeur relative médiane = {v['largeur_relative_mediane']:.0%}")
+    print("Répartition des erreurs sur le test :")
+    for key, v in report["repartition_erreurs_test"].items():
+        print(f"  {key:12s} " + "  ".join(f"{k.replace('moins_de_', '<').replace('_pct', ' %')}: {x:.0%}" for k, x in v.items()))
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--test", action="store_true", help="évaluation finale sur le test (une seule fois)")
-    run(final=ap.parse_args().test)
+    ap.add_argument("--force", action="store_true", help="relancer le test malgré un rapport existant")
+    a = ap.parse_args()
+    run(final=a.test, save_models=a.test, force=a.force)

@@ -1,0 +1,96 @@
+{
+  "modele": "hgb_geo",
+  "annees_entrainement": [
+    2021,
+    2025
+  ],
+  "n_ventes_entrainement": 112587,
+  "date_reference": "2025-12-31",
+  "bornes_prix_m2_entrainement": {
+    "Appartement": [
+      1172,
+      10319
+    ],
+    "Maison": [
+      541,
+      12756
+    ]
+  },
+  "lots_defaut": {
+    "Appartement": 1,
+    "Maison": 0
+  },
+  "bornes_saisie": {
+    "surface": {
+      "Appartement": [
+        9,
+        500
+      ],
+      "Maison": [
+        20,
+        1000
+      ]
+    },
+    "pieces": [
+      1,
+      15
+    ],
+    "terrain_maison_max": 10000
+  },
+  "evaluation_test_2025": {
+    "note": "modèle ajusté sur 2021-2024, évalué une seule fois sur 2025",
+    "mae_eur_m2": {
+      "all": 684,
+      "Appartement": 598,
+      "Maison": 745
+    },
+    "mape_mediane_pct": {
+      "all": 13.3,
+      "Appartement": 11.0,
+      "Maison": 15.1
+    },
+    "mape_pct": {
+      "all": 25.2,
+      "Appartement": 18.2,
+      "Maison": 30.2
+    },
+    "mae_baseline_eur_m2": 884,
+    "couverture_fourchette": {
+      "all": 0.804,
+      "Appartement": 0.804,
+      "Maison": 0.803
+    },
+    "largeur_relative_mediane": {
+      "all": 0.68,
+      "Appartement": 0.46,
+      "Maison": 0.68
+    },
+    "repartition_erreurs": {
+      "all": {
+        "moins_de_10_pct": 0.3944355758266819,
+        "moins_de_20_pct": 0.6695096921322691,
+        "moins_de_30_pct": 0.8057924743443557,
+        "moins_de_50_pct": 0.9091904218928164
+      },
+      "Appartement": {
+        "moins_de_10_pct": 0.4628666297731046,
+        "moins_de_20_pct": 0.7475373547315993,
+        "moins_de_30_pct": 0.8724958494742667,
+        "moins_de_50_pct": 0.9515218594355285
+      },
+      "Maison": {
+        "moins_de_10_pct": 0.34647013188518233,
+        "moins_de_20_pct": 0.6148176881303336,
+        "moins_de_30_pct": 0.7590380139643135,
+        "moins_de_50_pct": 0.8795190069821567
+      }
+    },
+    "n_ventes_test": 21925
+  },
+  "versions": {
+    "python": "3.12.10",
+    "scikit-learn": "1.9.1",
+    "pandas": "2.3.3",
+    "numpy": "2.5.3"
+  }
+}

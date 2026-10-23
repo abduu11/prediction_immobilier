@@ -17,5 +17,8 @@ models/
 # Cartes interactives HTML (lourdes, régénérées par `python -m immo.maps`)
 reports/maps/
 
+# Configuration locale de l'aperçu
+.claude/
+
 # Divers
 .DS_Store

@@ -1,64 +1,54 @@
-# Prédiction du prix au m² — DVF (Gironde)
+# Prix au m² en Gironde : prédire à partir des ventes réelles (DVF)
 
-Projet data : prédire le prix au m² des appartements et maisons à partir des
+Estimer le **prix au m²** d'un appartement ou d'une maison en Gironde à partir des
 [Demandes de valeurs foncières](https://www.data.gouv.fr/fr/datasets/demandes-de-valeurs-foncieres-geolocalisees/)
-(DGFiP / Etalab, Licence Ouverte 2.0).
+(DGFiP / Etalab, Licence Ouverte 2.0), avec une **fourchette de prix** calibrée sur les erreurs réellement observées.
 
-**Stack** : Python, pandas, scikit-learn, Streamlit. **MVP** : Gironde (33), 2021–2025.
+**Statut : version 1 (v1).** Un projet de portfolio, pas un outil d'expertise : la précision est limitée par
+les informations disponibles dans les données publiques (voir [Limites](#limites-et-pistes-pour-la-v2)).
 
-> Statut : sprints 1 à 5 terminés (données, nettoyage, baseline, modèles, géographie et cartes). Voir l'avancement ci-dessous.
+> **Application en ligne :** _(lien à ajouter après le déploiement sur Streamlit Community Cloud)_
 
-## Installation
+**Stack** : Python, pandas, scikit-learn, Streamlit, pydeck. Données gratuites uniquement.
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate          # Windows (Linux/macOS : source .venv/bin/activate)
-pip install -r requirements.txt
-```
+## En bref
 
-## Reproduire les étapes
+Résultats mesurés **une seule fois** sur les 21 925 ventes de 2025, jamais vues pendant la conception :
 
-```bash
-set PYTHONPATH=src              # PowerShell : $env:PYTHONPATH="src"
-python -m immo.download         # télécharge data/raw/*.csv.gz + data/manifest.json
-pytest                          # tests unitaires + tests sur les vrais fichiers
-```
+| | Ensemble | Appartements | Maisons |
+|---|---:|---:|---:|
+| Erreur moyenne du modèle (MAE) | **684 €/m²** | 598 €/m² | 745 €/m² |
+| Erreur relative médiane | **13,3 %** | 11,0 % | 15,1 % |
+| Erreur de la baseline (médiane par commune) | 884 €/m² | 823 €/m² | 927 €/m² |
+| Gain par rapport à la baseline | **−22,6 %** | −27,3 % | −19,6 % |
+| Couverture de la fourchette à 80 % | **80,4 %** | 80,4 % | 80,3 % |
 
-La configuration (département, années) est dans `config.yaml`.
+Pour un bien dont le prix prédit est de 3 500 €/m², la fourchette affichée est d'environ 2 700 à 4 270 €/m² pour
+un appartement et 2 170 à 4 550 €/m² pour une maison. **Elle est large : c'est voulu**, elle reflète l'erreur réelle du
+modèle. Sur le test 2025, l'écart entre prix prédit et prix réel est inférieur à 10 % pour 39 % des ventes, à 20 % pour
+67 %, à 30 % pour 81 %, et supérieur à 50 % pour 9 %.
 
-## Structure
+## Question et données
 
-```
-config.yaml          paramètres (département, années, chemins)
-src/immo/            download, loader, clean, split, baseline, features, geo, neighbors, models, train,
-                     evaluate, spatial, maps, metrics, config
-tests/               pytest
-notebooks/           01_exploration.ipynb
-reports/             funnel.csv, metrics.json, best_params.json, spatial_cv.json, erreurs_par_commune.csv,
-                     figures/ (cartes PNG)
-models/              modèles entraînés (gitignoré)
-data/                raw/ (gitignoré), manifest.json (versions + SHA-256), README.md
-```
+*Étant donné un appartement ou une maison (commune, type, surface, pièces, terrain, dépendance), quel est son prix de
+vente au m² attendu, et avec quelle marge d'erreur ?*
 
-## Données
+- **Source** : DVF géolocalisées (Etalab), un fichier par année et par département :
+  `files.data.gouv.fr/geo-dvf/latest/csv/{année}/departements/33.csv.gz`. Gironde, 2021-2025
+  (version d'avril 2026). Hors périmètre DVF : Alsace, Moselle, Mayotte.
+- **Version figée** : `data/manifest.json` enregistre la taille et l'empreinte SHA-256 de chaque fichier (les
+  fichiers sont remplacés à chaque mise à jour semestrielle). Détails dans [data/README.md](data/README.md).
+- **Contours et populations des communes** : `geo.api.gouv.fr`.
 
-Voir [data/README.md](data/README.md) : source, schéma, périmètre, version figée.
+## Démarche
 
-## Nettoyage (sprint 2)
+### 1. Nettoyage : une ligne = une vente simple
 
-```bash
-python -m immo.clean    # -> data/processed/ventes_clean.parquet + reports/funnel.csv
-```
-
-Règles : ventes uniquement ; une seule disposition ; aucun local commercial ; **un seul
-logement par mutation** (les lignes répétées d'un même bien, une par nature de culture, sont
-fusionnées ; les mutations multi-logements sont écartées car le prix n'est pas ventilable) ;
-dépendances tolérées (`has_dependance`) ; surface de terrain = somme des morceaux de terrain
-distincts ; bornes de surface, pièces, prix minimal et garde-fous prix/m² (`config.yaml`).
-Les bornes par quantiles (P1–P99) sont **estimées sur le train uniquement**
-(`fit_price_bounds` / `apply_price_bounds`, utilisées au sprint 3).
-
-Entonnoir (Gironde 2021–2025, en mutations) :
+Le fichier DVF compte une ligne par parcelle, nature de culture ou dépendance, pas une ligne par vente.
+Règles (`src/immo/clean.py`, bornes dans `config.yaml`) : ventes ordinaires uniquement ; une seule disposition ;
+aucun local commercial ; **un seul logement par transaction** (le prix d'une transaction regroupant plusieurs
+logements n'est pas ventilable) ; dépendances tolérées ; lignes répétées d'un même bien fusionnées, surface de terrain =
+somme des morceaux distincts ; bornes de surface, de pièces et de prix.
 
 | Étape | Mutations restantes | Perdues |
 |---|---:|---:|
@@ -75,83 +65,44 @@ Entonnoir (Gironde 2021–2025, en mutations) :
 | Terrain maison ≤ 10 000 m² | 115 109 | 1 664 |
 | Prix/m² entre 200 et 25 000 € | **114 887** | 222 |
 
-Résultat : 46 221 appartements et 68 666 maisons, 1,7 % sans coordonnées (conservées avec
-l'indicateur `coords_missing`, à imputer dans le pipeline de modélisation).
+Résultat : 46 221 appartements et 68 666 maisons (1,7 % sans coordonnées, complétées par le centroïde de la commune).
 
-## Validation et baseline (sprint 3)
+### 2. Découpage dans le temps et baseline
 
-```bash
-python -m immo.evaluate          # ajuste sur 2021-2023, évalue sur la validation 2024 -> reports/metrics.json
-```
+| Jeu | Années | Ventes | Rôle |
+|---|---|---:|---|
+| Entraînement | 2021-2023 | 75 169 | apprendre, régler les hyperparamètres (validation croisée temporelle) |
+| Validation | 2024 | 17 793 | comparer les modèles, calibrer la fourchette |
+| **Test** | **2025** | 21 925 | **évalué une seule fois** (`python -m immo.evaluate --test`, avec garde-fou contre un second lancement) |
 
-- **Découpage temporel** (`config.yaml`, section `split`) : train 2021–2023 (75 169 ventes),
-  validation 2024 (17 793), **test 2025 (21 925) réservé à l'évaluation finale** (`--test`, une seule fois,
-  avec ajustement sur train+validation).
-- **Anti-fuite** : les bornes P1–P99 du prix/m² sont estimées sur les données d'ajustement et ne servent
-  qu'à les filtrer ; les jeux d'évaluation ne sont jamais tronqués. La baseline ne lit jamais la cible
-  du jeu évalué (testé).
-- **Baseline** : médiane du prix/m² par (commune, type), avec repli sur la médiane du type si la commune a
-  moins de 5 ventes dans le train (0,65 % des ventes de 2024).
+Baseline : médiane du prix/m² par (commune, type de bien), repli sur la médiane du type si la commune a moins de
+5 ventes. Les seuils P1-P99 du prix/m² sont estimés sur les données d'ajustement et ne servent qu'à les filtrer :
+**les jeux d'évaluation ne sont jamais tronqués.**
 
-Résultats de la baseline sur la validation 2024 :
+### 3. Modèles et variables
 
-| | n | MAE (€/m²) | MAPE | MAPE médiane | biais (€/m²) | R² |
-|---|---:|---:|---:|---:|---:|---:|
-| Ensemble | 17 793 | 899 | 33,0 % | 17,3 % | +64 | 0,46 |
-| Appartements | 7 433 | 851 | 26,0 % | 15,5 % | +119 | 0,42 |
-| Maisons | 10 360 | 933 | 38,1 % | 18,8 % | +25 | 0,47 |
+- **Ridge** (régression linéaire régularisée, interactions d'ordre 2) et **HistGradientBoostingRegressor** (arbres),
+  tous deux sur le **logarithme** du prix/m², dans un `Pipeline` scikit-learn. Hyperparamètres choisis par validation
+  croisée temporelle à fenêtre croissante sur l'entraînement seul (`reports/best_params.json`).
+- **Variables** : surface, pièces, surface par pièce, type, terrain (maisons), dépendance, nombre de lots, index
+  mensuel, commune et commune×type (encodage cible), latitude/longitude et axes tournés à 45°.
+- **Variables géographiques dérivées** (variantes `_geo`) : distance au centre de Bordeaux et au littoral (tracé
+  approximatif à ±3 km), population et densité de la commune, et **prix des 10 ventes voisines antérieures** de même type.
+- **Anti-fuite** : tout ce qui s'apprend (centroïdes, encodage, prix des voisins, normalisation) est dans le `Pipeline`
+  et ajusté sur les données d'ajustement seules. Le prix des voisins ne regarde que des ventes **strictement
+  antérieures** (une vente ne se voit jamais elle-même, ni le futur, ni une vente du même jour). Des tests
+  automatiques vérifient ces propriétés.
 
-Pour situer la difficulté : prédire la médiane globale du type de bien donne une MAE de 1 321 €/m²
-(MAPE 52 %). La médiane par commune la réduit déjà de 32 %. La baseline ignore la surface, les
-pièces, la date et les coordonnées ; les sprints suivants les ajoutent.
-La MAPE (moyenne) est tirée vers le haut par les biens à faible prix/m² ; la MAPE médiane est plus robuste.
+### 4. Fourchette de prix
 
-## Modèles (sprint 4)
+Sur la validation, on mesure le rapport *prix réel / prix prédit* par type de bien. Ses quantiles à 10 % et 90 % donnent
+des facteurs multiplicatifs : fourchette = prédiction × (facteur bas, facteur haut), soit × 0,76 à × 1,22 pour les
+appartements et × 0,62 à × 1,30 pour les maisons. La couverture réelle est mesurée sur le test 2025, qui n'a servi
+ni à ajuster ni à calibrer : 80,4 % pour 80 % visés.
 
-```bash
-python -m immo.train             # réglage (CV temporelle sur le train) + évaluation sur la validation 2024
-python -m immo.evaluate          # ré-évalue avec reports/best_params.json (sans re-régler)
-```
+## Résultats
 
-- **Variables** (`features.py`) : surface (et log), pièces, surface/pièce, maison/appartement, terrain (maisons),
-  dépendance, lots, index mensuel, commune et commune×type (encodage cible), latitude/longitude
-  (+ 2 axes tournés à 45°). Les coordonnées manquantes sont remplacées par le centroïde de la commune
-  appris sur le train.
-- **Anti-fuite** : tout ce qui s'apprend (centroïdes, `TargetEncoder` validé en 5 plis, normalisation) est dans
-  le `Pipeline` et ajusté sur les données d'ajustement seules (testé : l'encodeur ne connaît que les communes du train).
-- **Cible** : log(prix/m²), prédiction ramenée en €/m².
-- **Ridge** : interactions d'ordre 2 + régularisation. **HistGradientBoosting** (HGB) : perte absolue, jusqu'à 1 000
-  itérations. Hyperparamètres choisis par validation croisée temporelle à fenêtre croissante sur le train
-  (2021 → 2022, 2021-22 → 2023), critère MAE ; ils sont dans `reports/best_params.json`.
-
-Résultats sur la validation 2024 (17 793 ventes), détaillés avec les variantes géographiques plus bas :
-Ridge −7,3 % et HGB −19,5 % de MAE par rapport à la baseline.
-
-Par type de bien, HGB : appartements MAE 644 €/m² (MAPE 18,6 %), maisons MAE 781 €/m² (MAPE 32,7 %).
-Les maisons sont plus difficiles : le prix/m² dépend beaucoup du terrain, de l'état et de la situation exacte,
-absents des données.
-
-La validation 2024 a servi à choisir quelques options de conception (index temporel pour HGB seulement) ;
-le test 2025 reste intact.
-
-## Géographie et validation spatiale (sprint 5)
-
-```bash
-python -m immo.geo               # télécharge les communes (contours, population) : data/raw/communes_33.geojson
-python -m immo.train             # réglage des 4 modèles + validation 2024
-python -m immo.spatial           # validation spatiale (GroupKFold) -> reports/spatial_cv.json
-python -m immo.maps              # cartes -> reports/figures/*.png (+ HTML interactifs dans reports/maps/)
-```
-
-Variables ajoutées (variantes `_geo`) :
-- distance au centre de Bordeaux et **au littoral** (trait de côte tracé à la main avec ~11 points, précision ±3 km :
-  c'est une approximation, vérifiée sur des lieux connus dans les tests) ;
-- population et densité de la commune (geo.api.gouv.fr, instantané récent : variable de contexte) ;
-- **prix des ventes voisines** : médiane du prix/m² des 10 ventes de même type les plus proches **strictement
-  antérieures** dans le jeu d'ajustement (une vente ne voit jamais elle-même, ni le futur, ni une vente du même jour ;
-  testé).
-
-Validation 2024 (ajustement sur 2021-2023) :
+### Sélection des modèles (validation 2024, ajustement sur 2021-2023)
 
 | Modèle | MAE (€/m²) | vs baseline | MAPE | MAPE médiane | R² |
 |---|---:|---:|---:|---:|---:|
@@ -161,45 +112,156 @@ Validation 2024 (ajustement sur 2021-2023) :
 | HGB | 724 | −19,5 % | 26,8 % | 13,9 % | 0,65 |
 | **HGB + géographie** | **717** | **−20,2 %** | 26,5 % | 13,6 % | 0,66 |
 
-La géographie aide beaucoup le modèle linéaire (−7 % de MAE) mais peu l'HGB (−1 %) sur 2024 : les arbres
-exploitent déjà latitude, longitude et commune. Appartements (HGB + géo) : MAE 630 €/m², MAPE 18,2 % ;
-maisons : MAE 779 €/m², MAPE 32,5 %.
+### Évaluation finale (test 2025, ajustement sur 2021-2024)
 
-**Validation spatiale** (5 plis sur les ventes 2021-2024, sans tenir compte du temps ; le test 2025 n'est pas utilisé).
-Dans le schéma « commune », les communes évaluées sont absentes de l'entraînement : c'est le cas d'usage d'une
-commune où l'on a peu ou pas d'historique.
+Le modèle retenu d'après la validation (HGB + géographie) a été évalué une seule fois ; tous les modèles sont
+rapportés par transparence (`reports/metrics_test.json`).
+
+| Modèle | MAE (€/m²) | vs baseline | MAPE | MAPE médiane | R² |
+|---|---:|---:|---:|---:|---:|
+| Baseline (médiane par commune) | 884 | — | 33,2 % | 17,5 % | 0,46 |
+| Ridge | 811 | −8,3 % | 29,0 % | 15,9 % | 0,51 |
+| Ridge + géographie | 742 | −16,1 % | 27,7 % | 14,7 % | 0,62 |
+| HGB | 698 | −21,0 % | 25,8 % | 13,5 % | 0,65 |
+| **HGB + géographie** | **684** | **−22,6 %** | **25,2 %** | **13,3 %** | **0,66** |
+
+Le classement des modèles est le même que sur la validation. Les appartements sont mieux prédits (MAPE 18,2 %) que les
+maisons (30,2 %) : le prix d'une maison dépend du terrain, de l'état et de la situation exacte, absents des données.
+
+| Écart entre prix prédit et prix réel | < 10 % | < 20 % | < 30 % | < 50 % |
+|---|---:|---:|---:|---:|
+| Ensemble | 39 % | 67 % | 81 % | 91 % |
+| Appartements | 46 % | 75 % | 87 % | 95 % |
+| Maisons | 35 % | 61 % | 76 % | 88 % |
+
+### Validation spatiale (communes jamais vues)
+
+GroupKFold à 5 plis sur les ventes 2021-2024, en ignorant volontairement le temps pour isoler l'effet de la
+géographie. Dans le schéma « commune », les communes évaluées sont absentes de l'entraînement.
 
 | Schéma | Baseline | HGB | HGB + géographie |
 |---|---:|---:|---:|
 | Commune (534 groupes), MAE €/m² | 1 446 | 1 173 | **1 044** |
 | Commune, MAPE | 52,2 % | 37,2 % | **32,9 %** |
 | Blocs de 5 km (409 groupes), MAE €/m² | 1 079 | 842 | 837 |
-| Blocs de 5 km, MAPE | 40,4 % | 29,2 % | 28,2 % |
 
-- Sur une commune jamais vue, la baseline retombe sur la médiane du type de bien (R² ≈ 0) ; les variables
-  géographiques réduisent l'erreur de l'HGB de **11 %** (1 173 → 1 044).
-- Dans le schéma par blocs de 5 km, l'écart géographique disparaît : une même commune est souvent répartie sur
-  plusieurs blocs, donc l'encodage de la commune reste informatif. Ce schéma est moins sévère qu'il n'y paraît.
-- Les erreurs par pli varient fortement (de 718 à 1 405 €/m² pour l'HGB + géo, schéma commune) : le pli qui contient
-  les grandes communes est le plus difficile.
+Sur une commune jamais vue, les variables géographiques réduisent l'erreur de l'HGB de 11 %. Dans le schéma par blocs,
+l'écart disparaît : une commune est souvent répartie sur plusieurs blocs, donc l'encodage de la commune reste
+informatif ; ce schéma est moins sévère qu'il n'y paraît.
 
-**Cartes** (validation 2024, modèle HGB + géographie) :
+### Cartes
 
 ![Prix médian par commune](reports/figures/carte_prix.png)
-![Erreurs du modèle](reports/figures/carte_erreurs.png)
+![Erreurs du modèle sur le test 2025](reports/figures/carte_erreurs.png)
 
 Les prix les plus élevés se concentrent sur le littoral du Bassin d'Arcachon et autour de Bordeaux, les plus bas
-dans l'est et le sud rural. Les erreurs ne sont calculées que pour les communes ayant au moins 10 ventes de validation
-(206 sur 491) : le reste, surtout rural, est grisé. Les communes en rouge foncé (surestimation) sont des cas isolés à
-faible effectif.
+dans l'est et le sud ruraux. Les erreurs ne sont calculées que pour les communes avec au moins 10 ventes de test
+(236 sur 501) ; le reste, surtout rural, est grisé.
+
+## Application
+
+`app/streamlit_app.py`, trois onglets :
+
+- **Estimer un bien** : commune, type, surface, pièces, terrain, dépendance → fourchette en €/m² et en prix total,
+  repère du prix médian de la commune, avertissement si la commune compte peu de ventes.
+- **Cartes** : prix médian, biais et erreur relative médiane du modèle, cartes interactives.
+- **Méthodologie et limites** : précision mesurée, lecture de la fourchette, limites.
+
+```bash
+streamlit run app/streamlit_app.py
+```
+
+**Le modèle en ligne est ré-ajusté sur 2021-2025** (même recette, une année de données en plus). Les chiffres de
+précision ci-dessus décrivent le modèle ajusté sur 2021-2024 et évalué sur 2025 ; la précision exacte du modèle en
+ligne n'est donc pas mesurée (il n'existe plus de données qu'il n'ait pas vues). Une vérification sur les ventes de
+2026, à la prochaine mise à jour DVF, serait un vrai test dans le futur.
+
+L'application ne lit que `app/artifacts/` (modèle, contours simplifiés, tables par commune), régénéré par
+`python -m immo.export`. Le fichier du modèle embarque les coordonnées et prix (en logarithme) des ventes d'ajustement,
+nécessaires à la variable « prix des voisins » : ce sont des données publiques DVF, et l'application n'affiche aucune adresse.
+
+## Limites et pistes pour la v2
+
+**Limites connues**
+
+- **Variables absentes des données publiques** : état du bien, étage, vue, exposition, DPE, qualité de la rue. Deux biens
+  identiques dans la même rue peuvent différer de 30 % : c'est la principale limite de précision. Le modèle donne un
+  ordre de grandeur, pas un prix de vente ou d'achat.
+- **Localisation à la commune** : le bien est placé au centre de la commune ; le quartier n'est pas pris en compte
+  dans les grandes communes.
+- **Maisons moins bien prédites** que les appartements ; fourchette plus large (× 0,62 à × 1,30).
+- **Communes rurales** : peu de ventes, erreurs plus fortes, cartes d'erreurs grisées.
+- **Marché** : le prix médian du m² a baissé entre 2022 et 2025 ; un retournement brusque ne serait pas anticipé.
+- **Distance au littoral** : tracé à la main (±3 km).
+- **Choix guidés par la validation** (variables retenues, index temporel pour les arbres, grille de réglage élargie
+  une fois) : le test 2025 n'a été utilisé qu'une fois, à la fin, mais ces choix de conception ont vu les données 2021-2024.
+- **Modèle en ligne** différent du modèle évalué (voir plus haut).
+- **Ventes exclues** : ventes sur plan (VEFA), transactions regroupant plusieurs logements, locaux commerciaux.
+
+**Pistes pour la v2** : joindre le DPE (ADEME, gratuit) par adresse ; saisie d'une adresse précise pour tenir compte du
+quartier ; régression par quantiles pour une fourchette qui s'adapte au bien ; explicabilité (importance par permutation) ;
+extension à d'autres départements puis à la France entière (lecture par morceaux, Parquet) ; test dans le futur sur les
+ventes de 2026.
+
+## Reproduire
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate                 # Linux/macOS : source .venv/bin/activate
+pip install -r requirements.txt
+set PYTHONPATH=src                     # PowerShell : $env:PYTHONPATH="src"  ·  Linux/macOS : export PYTHONPATH=src
+```
+
+```bash
+python -m immo.download                # ventes DVF + manifeste (taille, SHA-256)
+python -m immo.geo                     # contours et populations des communes
+python -m immo.clean                   # nettoyage -> data/processed + reports/funnel.csv
+python -m immo.train                   # réglage (validation croisée temporelle) + validation 2024 (~15 min)
+python -m immo.spatial                 # validation spatiale -> reports/spatial_cv.json
+python -m immo.evaluate --test         # évaluation finale 2025 : UNE SEULE FOIS
+python -m immo.maps                    # cartes -> reports/figures
+python -m immo.export                  # modèle 2021-2025 + artefacts de l'application
+pytest                                 # 84 tests
+```
+
+La configuration (département, années, bornes de nettoyage, découpage, modèle retenu) est dans `config.yaml`.
+Les graines aléatoires sont fixées ; les données intermédiaires sont régénérables et non versionnées.
+
+## Structure du dépôt
+
+```
+config.yaml          paramètres (département, années, bornes, découpage)
+app/                 streamlit_app.py, artifacts/ (modèle, contours, tables), requirements.txt
+src/immo/            download, loader, clean, split, baseline, features, geo, neighbors, models, train,
+                     evaluate, intervals, spatial, maps, predict, export, metrics, config
+tests/               pytest (84 tests : nettoyage, absence de fuite, fourchette, validation spatiale, application)
+notebooks/           01_exploration.ipynb
+reports/             funnel.csv, metrics.json (validation), metrics_test.json (test 2025), best_params.json,
+                     spatial_cv.json, intervalles.json, erreurs_par_commune.csv, figures/ (cartes)
+data/                raw/ et processed/ (gitignorés), manifest.json, README.md
+```
+
+## Tests
+
+Les 84 tests couvrent : schéma des données et manifeste ; règles de nettoyage sur des cas construits à la main
+(deux appartements écartés, bien répété fusionné, terrain non compté deux fois) ; **absence de fuite** (encodeur ajusté
+sur l'entraînement seul, prédiction indépendante de la cible, prix des voisins sans le futur, calibration de la
+fourchette sans les prix du test, refus de relancer le test) ; distances géographiques ; validation spatiale ; et
+l'application complète (`streamlit.testing`).
+
+## Données, licence et vie privée
+
+Données DVF © DGFiP, géolocalisation Etalab, **Licence Ouverte 2.0** ; contours et populations © geo.api.gouv.fr.
+Aucune donnée personnelle n'est ajoutée, aucune adresse n'est affichée ; le jeu est public.
 
 ## Avancement
 
-| Sprint | Contenu | État |
+| Étape | Contenu | État |
 |---|---|---|
-| S1 | Données : téléchargement, lecture typée, exploration | ✅ |
-| S2 | Nettoyage (multi-lots, doublons, aberrants) | ✅ |
-| S3 | Découpage temporel + baseline | ✅ |
-| S4 | Ridge + HistGradientBoosting | ✅ |
-| S5 | Variables géographiques, validation spatiale, cartes | ✅ |
-| S6 | App Streamlit, déploiement | à faire |
+| Sprint 1 | Données : téléchargement, lecture typée, exploration | ✅ |
+| Sprint 2 | Nettoyage et entonnoir | ✅ |
+| Sprint 3 | Découpage temporel, baseline, métriques | ✅ |
+| Sprint 4 | Ridge et HistGradientBoosting | ✅ |
+| Sprint 5 | Géographie, validation spatiale, cartes | ✅ |
+| Sprint 6 | Évaluation finale 2025, fourchette, application, README | ✅ |
+| Sprint 6 | Déploiement sur Streamlit Community Cloud | à faire |
