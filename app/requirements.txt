@@ -1,9 +1,9 @@
-streamlit>=1.35
-pandas>=2.2,<3
-numpy>=1.26
+streamlit==1.64.0
+pandas==2.3.3
+numpy==2.5.3
 scikit-learn==1.9.1
-scipy>=1.11
-pyarrow>=15
-pydeck>=0.9
-matplotlib>=3.8
-PyYAML>=6.0
+scipy==1.18.1
+matplotlib==3.11.2
+pydeck==0.9.3
+requests==2.34.2
+PyYAML==6.0.3
